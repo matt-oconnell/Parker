@@ -7,20 +7,61 @@
 //
 
 import UIKit
+import MapKit
 
-class ViewController: UIViewController {
+class ViewController: UIViewController, MKMapViewDelegate, CLLocationManagerDelegate {
+    
+    // MARK - Constants
+    let NEXTDAY = "nextDay"
+    let COORDINATE = "coordinate"
+    let LATITUDE = "latitude"
+    let LONGITUDE = "longitude"
+    
     
     // MARK - Local Variables
-    let NextDay = "nextDay"
-
+    let locationManager = CLLocationManager()
+    let geocoder:CLGeocoder = CLGeocoder()
+    var placemark:MKPlacemark!
+    
+    
+    // MARK - Outlets
+    @IBOutlet weak var nextDay: UILabel!
+    @IBOutlet weak var mapView: MKMapView!
+    
+    
     // MARK - Helper Functions
     func updateNextDay(day: String) {
         nextDay.text = "Next move day: " + day
     }
     
+    func checkForLocationAuthorization() {
+        let status = CLLocationManager.authorizationStatus()
+        
+        switch status {
+        case .authorizedAlways, .authorizedWhenInUse:
+            return
+        case .denied, .restricted:
+            print("location denied")
+        default:
+            locationManager.requestWhenInUseAuthorization()
+        }
+    }
     
-    // MARK - Outlets
-    @IBOutlet weak var nextDay: UILabel!
+    func addPin() {
+        
+        // Clear old pins
+        let allAnnotations = self.mapView.annotations
+        self.mapView.removeAnnotations(allAnnotations)
+        
+        // Get saved coords
+        let coords = UserDefaults.standard.value(forKey: self.COORDINATE) as! [String:Double]
+        if let lat = coords[self.LATITUDE], let lon = coords[self.LONGITUDE] {
+            
+            // Add Pin Annotation
+            let place = Place(title: "test", subtitle: "subtitle", latitude: lat, longitude: lon)
+            mapView.addAnnotation(place)
+        }
+    }
     
     
     // MARK - Actions
@@ -33,8 +74,9 @@ class ViewController: UIViewController {
         
         for day in days {
             let action = UIAlertAction(title: day, style: .default, handler: { (action) -> Void in
-                UserDefaults.standard.set(day, forKey: self.NextDay)
+                UserDefaults.standard.set(day, forKey: self.NEXTDAY)
                 self.updateNextDay(day: day)
+                self.locationManager.startUpdatingLocation()
             })
             alertActions.append(action)
         }
@@ -51,9 +93,21 @@ class ViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        if let day = UserDefaults.standard.string(forKey: NextDay) {
+        // Delegates
+        mapView.delegate = self
+        locationManager.delegate = self
+        
+        addPin()
+
+        locationManager.desiredAccuracy = kCLLocationAccuracyBest
+        
+        if let day = UserDefaults.standard.string(forKey: self.NEXTDAY) {
             self.updateNextDay(day: day)
         }
+    }
+    
+    override func viewDidAppear(_ animated: Bool) {
+        checkForLocationAuthorization()
     }
 
     override func didReceiveMemoryWarning() {
@@ -61,5 +115,30 @@ class ViewController: UIViewController {
     }
 
 
+    // MARK - Delegate Methods
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        
+        let currentLocation = locations.first
+        
+        self.geocoder.reverseGeocodeLocation(currentLocation!) { (placemarks, error) in
+
+            if (placemarks != nil && placemarks!.count > 0) {
+
+                let coordinate = placemarks!.first?.location?.coordinate
+
+                let userLocation:[String:Double] = [
+                    self.LATITUDE: coordinate!.latitude,
+                    self.LONGITUDE: coordinate!.longitude
+                ]
+
+                // Save Location
+                UserDefaults.standard.set(userLocation, forKey: self.COORDINATE)
+                
+                self.addPin()
+
+                self.locationManager.stopUpdatingLocation()
+            }
+        }
+    }
 }
 
