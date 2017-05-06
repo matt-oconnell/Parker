@@ -8,6 +8,7 @@
 
 import UIKit
 import MapKit
+import Alamofire
 
 class ViewController: UIViewController, MKMapViewDelegate, CLLocationManagerDelegate {
     
@@ -21,7 +22,6 @@ class ViewController: UIViewController, MKMapViewDelegate, CLLocationManagerDele
     // MARK - Local Variables
     let locationManager = CLLocationManager()
     let geocoder:CLGeocoder = CLGeocoder()
-    var placemark:MKPlacemark!
     
     
     // MARK - Outlets
@@ -54,12 +54,13 @@ class ViewController: UIViewController, MKMapViewDelegate, CLLocationManagerDele
         self.mapView.removeAnnotations(allAnnotations)
         
         // Get saved coords
-        let coords = UserDefaults.standard.value(forKey: self.COORDINATE) as! [String:Double]
-        if let lat = coords[self.LATITUDE], let lon = coords[self.LONGITUDE] {
-            
-            // Add Pin Annotation
-            let place = Place(title: "test", subtitle: "subtitle", latitude: lat, longitude: lon)
-            mapView.addAnnotation(place)
+        if let coords = UserDefaults.standard.value(forKey: self.COORDINATE) as! [String:Double]? {
+            if let lat = coords[self.LATITUDE], let lon = coords[self.LONGITUDE] {
+                
+                // Add Pin Annotation
+                let place = Place(title: "test", subtitle: "subtitle", latitude: lat, longitude: lon)
+                mapView.addAnnotation(place)
+            }
         }
     }
     
@@ -92,6 +93,19 @@ class ViewController: UIViewController, MKMapViewDelegate, CLLocationManagerDele
     // MARK - Lifecycle Methods
     override func viewDidLoad() {
         super.viewDidLoad()
+        
+        // TEST
+        Alamofire.request("https://nyc-asp-twitter.herokuapp.com/").responseJSON { response in
+            print(response.request)  // original URL request
+            print(response.response) // HTTP URL response
+            print(response.data)     // server data
+            print(response.result)   // result of response serialization
+            
+            if let JSON = response.result.value {
+                print("JSON: \(JSON)")
+            }
+        }
+        
         
         // Delegates
         mapView.delegate = self
