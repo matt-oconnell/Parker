@@ -154,5 +154,47 @@ class ViewController: UIViewController, MKMapViewDelegate, CLLocationManagerDele
             }
         }
     }
+    
+    func mapView(_ mapView: MKMapView, didUpdate userLocation: MKUserLocation) {
+        let regionRadius: Double
+        var parkedLat: Double?
+        var parkedLon: Double?
+
+        if let coords = UserDefaults.standard.value(forKey: self.COORDINATE) as! [String:Double]? {
+            if let lat = coords[self.LATITUDE], let lon = coords[self.LONGITUDE] {
+                //
+                parkedLat = lat
+                parkedLon = lon
+            }
+        }
+        
+        let userLat = userLocation.coordinate.latitude
+        let userLon = userLocation.coordinate.longitude
+        let userCoords2d = CLLocationCoordinate2D(latitude: userLat, longitude: userLon)
+        let userCoords = CLLocation(latitude: userLat, longitude: userLon)
+        
+        
+        let midpoint: CLLocationCoordinate2D
+        
+        if (parkedLat != nil && parkedLon != nil) {
+            
+            let midLat = (userLat + parkedLat!) / 2
+            let midLon = (userLon + parkedLon!) / 2
+            
+            midpoint = CLLocationCoordinate2D(latitude: midLat, longitude: midLon)
+            let parkedCoords = CLLocation(latitude: parkedLat!, longitude: parkedLon!)
+            
+            let distance = userCoords.distance(from: parkedCoords)
+            let buffer = distance * 0.3
+            regionRadius = distance + buffer
+        }
+        else {
+            midpoint = userCoords2d
+            regionRadius = 400.0
+        }
+        
+        let coordinateRegion = MKCoordinateRegionMakeWithDistance( midpoint, CLLocationDistance(regionRadius), CLLocationDistance(regionRadius) )
+        self.mapView.setRegion( coordinateRegion, animated: true)
+    }
 }
 
