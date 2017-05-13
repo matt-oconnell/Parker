@@ -53,16 +53,54 @@ class ViewController: UIViewController, MKMapViewDelegate, CLLocationManagerDele
         let allAnnotations = self.mapView.annotations
         self.mapView.removeAnnotations(allAnnotations)
         
-        // Get saved coords
-        if let coords = UserDefaults.standard.value(forKey: self.COORDINATE) as! [String:Double]? {
-            if let lat = coords[self.LATITUDE], let lon = coords[self.LONGITUDE] {
-                
-                // Add Pin Annotation
-                let place = Place(title: "test", subtitle: "subtitle", latitude: lat, longitude: lon)
-                mapView.addAnnotation(place)
-            }
+        if let coords = getSavedCoords() {
+            // Add Pin Annotation
+            let place = Place(title: "test", subtitle: "subtitle", latitude: coords.lat, longitude: coords.lon)
+            mapView.addAnnotation(place)
         }
     }
+    
+    func getSavedCoords() -> (lat: Double, lon: Double)? {
+        if let coords = UserDefaults.standard.value(forKey: self.COORDINATE) as! [String:Double]? {
+            if let lat = coords[self.LATITUDE], let lon = coords[self.LONGITUDE] {
+                return (lat, lon)
+            }
+        }
+        return nil
+    }
+    
+    func getMidPoint(userLocation: MKUserLocation) -> CLLocationCoordinate2D {
+        let userLat = userLocation.coordinate.latitude
+        let userLon = userLocation.coordinate.longitude
+        let userCoords2d = CLLocationCoordinate2D(latitude: userLat, longitude: userLon)
+        let midpoint: CLLocationCoordinate2D
+        
+        if let savedCoords = getSavedCoords() {
+            let midLat = (userLat + savedCoords.lat) / 2
+            let midLon = (userLon + savedCoords.lon) / 2
+            midpoint = CLLocationCoordinate2D(latitude: midLat, longitude: midLon)
+        } else {
+            midpoint = userCoords2d
+        }
+        
+        return midpoint
+    }
+    
+    func getRadius(userLocation: MKUserLocation, defaultDistance: Double) -> Double {
+        let regionRadius: Double
+        
+        let userCoords = CLLocation(latitude: userLocation.coordinate.latitude, longitude: userLocation.coordinate.longitude)
+        
+        if let savedCoords = getSavedCoords() {
+            let parkedCoords = CLLocation(latitude: savedCoords.lat, longitude: savedCoords.lon)
+            regionRadius = userCoords.distance(from: parkedCoords) * 1.3
+        } else {
+            regionRadius = defaultDistance
+        }
+        
+        return regionRadius
+    }
+    
     
     
     // MARK - Actions
@@ -156,42 +194,8 @@ class ViewController: UIViewController, MKMapViewDelegate, CLLocationManagerDele
     }
     
     func mapView(_ mapView: MKMapView, didUpdate userLocation: MKUserLocation) {
-        let regionRadius: Double
-        var parkedLat: Double?
-        var parkedLon: Double?
-
-        if let coords = UserDefaults.standard.value(forKey: self.COORDINATE) as! [String:Double]? {
-            if let lat = coords[self.LATITUDE], let lon = coords[self.LONGITUDE] {
-                //
-                parkedLat = lat
-                parkedLon = lon
-            }
-        }
-        
-        let userLat = userLocation.coordinate.latitude
-        let userLon = userLocation.coordinate.longitude
-        let userCoords2d = CLLocationCoordinate2D(latitude: userLat, longitude: userLon)
-        let userCoords = CLLocation(latitude: userLat, longitude: userLon)
-        
-        
-        let midpoint: CLLocationCoordinate2D
-        
-        if (parkedLat != nil && parkedLon != nil) {
-            
-            let midLat = (userLat + parkedLat!) / 2
-            let midLon = (userLon + parkedLon!) / 2
-            
-            midpoint = CLLocationCoordinate2D(latitude: midLat, longitude: midLon)
-            let parkedCoords = CLLocation(latitude: parkedLat!, longitude: parkedLon!)
-            
-            let distance = userCoords.distance(from: parkedCoords)
-            let buffer = distance * 0.3
-            regionRadius = distance + buffer
-        }
-        else {
-            midpoint = userCoords2d
-            regionRadius = 400.0
-        }
+        let midpoint = getMidPoint(userLocation: userLocation)
+        let regionRadius = getRadius(userLocation: userLocation, defaultDistance: 400.0)
         
         let coordinateRegion = MKCoordinateRegionMakeWithDistance( midpoint, CLLocationDistance(regionRadius), CLLocationDistance(regionRadius) )
         self.mapView.setRegion( coordinateRegion, animated: true)
